@@ -9,8 +9,10 @@ if __name__ == '__main__':
     # Setup
     my_xgb = MyXGB(random_state=42)
     X_train, X_valid, X_test, y_train, y_valid, y_test = my_xgb.partition(X, y,
-                                                                       test_percentage=0.2,
-                                                                       val_percentage=0.2)
+                                                                          test_percentage=0.2,
+                                                                          val_percentage=0.2)
+    print(X_train.info())
+    print(X_train.dtypes.value_counts())
     """
     # Fit
     gbm.fit(X_train, y_train)
