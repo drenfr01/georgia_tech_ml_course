@@ -53,6 +53,11 @@ if __name__ == '__main__':
 
     datamunge = DataMunge()
 
-    X = datamunge.transform_variables(X, cat_features, num_features, date_features, drop_features)
+    X, new_datepart_features = datamunge.transform_variables(X, cat_features, num_features,
+                                                             date_features, drop_features)
+
+    num_features.extend(new_datepart_features)
 
     X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset.partition(X, y)
+
+

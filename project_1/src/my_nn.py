@@ -6,6 +6,16 @@ import pandas as pd
 import torch.utils.data as data_utils
 
 
+from sklearn.metrics import log_loss
+from sklearn.metrics import f1_score
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import StandardScaler
+
 class Net(nn.Module):
     def __init__(self, input_size):
         super(Net, self).__init__()
@@ -24,6 +34,8 @@ class MyNet():
 
     """
     def __init__(self, input_size: int, num_epochs: int, batch_size: int,
+                 num_features: int, cat_features: int,
+                 missing_value: str,
                  X: pd.DataFrame, y: pd.Series, save_path: str):
         self.input_size = input_size
         self.num_epochs = num_epochs
@@ -32,6 +44,10 @@ class MyNet():
         self.y = y
         self.save_path = save_path
 
+        self.num_features = num_features
+        self.cat_features = cat_features
+
+        self.missing_value = missing_value
     # Code taken from https://stackoverflow.com/questions/50307707/convert-pandas-dataframe-to-pytorch-tensor
     # Anh-Thi DINH
     @staticmethod
@@ -50,6 +66,30 @@ class MyNet():
         train_data = data_utils.DataLoader(train, batch_size = self.batch_size, shuffle=True)
         return train_data
 
+
+    def build_pipeline(self, imputation_strategy: str) -> Pipeline:
+
+        # Note: for linear models would use add_indicator flag here
+        # TODO: incorporate ridit or percentile transform
+        num_pipeline = Pipeline([
+            ('imputer', SimpleImputer(strategy=imputation_strategy,
+                                      add_indicator=True)),
+            ('standardize', StandardScaler())
+        ])
+
+        # TODO: think of better strategy to handle unknown levels
+        cat_pipeline = Pipeline([
+            ('missing', SimpleImputer(strategy="constant",
+                                      fill_value=self.missing_value)),
+            ('imputer', OneHotEncoder(handle_unknown='ignore'))
+        ])
+
+        full_pipeline = ColumnTransformer([
+            ("numeric", num_pipeline, self.num_features),
+            ("cat", cat_pipeline, self.cat_features)
+        ])
+
+        return full_pipeline
 
     # see PyTorch tutorial
     def train_nn(self) -> None:
