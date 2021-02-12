@@ -1,6 +1,7 @@
 from helper_files.helper_methods import LoadDataset
 from helper_files.data_munging_methods import DataMunge
 
+from housing.my_svm import MySVM
 
 class Housing:
     def __init__(self):
@@ -25,7 +26,7 @@ class Housing:
         # TODO: engineer features for price differences between prices?
         num_features = ['bedrooms',
                         'bathrooms',
-                        'sqrt_living',
+                        'sqft_living',
                         'sqft_lot',
                         'floors',
                         'waterfront',
@@ -58,11 +59,8 @@ class Housing:
 
         X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset.partition(X, y)
 
-        """
-        nn = MyNet(input_size=len(num_features), num_epochs=10, batch_size=128,
-                   num_features=num_features, cat_features=cat_features,
-                   missing_value="Missing", X=X_train, y=y_train, save_path="./my_nn")
+        my_svm = MySVM(random_state=42, num_features=num_features,
+                       cat_features=cat_features)
+        best_params = my_svm.tune_parameters(X_train, y_train)
 
 
-        nn.train_nn()
-        """
