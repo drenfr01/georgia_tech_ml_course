@@ -11,7 +11,8 @@ class LoadDataset:
 
 
     """
-    def __init__(self, data_file: str, target_feature: str, index_col: str, date_cols: list[str]) -> None:
+    def __init__(self, data_file: str, target_feature: str, index_col: str,
+                 date_cols: list[str]) -> None:
         """
         Parameters:
 
