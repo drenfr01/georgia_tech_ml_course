@@ -1,5 +1,6 @@
 from helper_methods import LoadDataset
 from data_munging_methods import DataMunge
+from my_nn import MyNet
 
 
 def define_features() -> tuple[list, list, list]:
@@ -60,4 +61,9 @@ if __name__ == '__main__':
 
     X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset.partition(X, y)
 
+    nn = MyNet(input_size=len(num_features), num_epochs=10, batch_size=128,
+               num_features=num_features, cat_features=cat_features,
+               missing_value="Missing", X=X_train, y=y_train, save_path="./my_nn")
 
+
+    nn.train_nn()
