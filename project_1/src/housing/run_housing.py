@@ -2,6 +2,7 @@ from helper_files.helper_methods import LoadDataset
 from helper_files.data_munging_methods import DataMunge
 
 from housing.my_svm import MySVM
+from housing.my_dt import MyDT
 
 class Housing:
     def __init__(self):
@@ -15,13 +16,9 @@ class Housing:
         # for data dictionary
         drop_features = ['lat', 'long']
 
-        # Note: view, condition, and grade could all be numeric as well
+        # Note: view, condition, and grade could all be categorical as well
         # TODO: play around with different representations?
-        cat_features = ['view',
-                        'condition',
-                        'grade',
-                        'zipcode',
-                        ]
+        cat_features = ['zipcode']
 
         # TODO: engineer features for price differences between prices?
         num_features = ['bedrooms',
@@ -32,6 +29,9 @@ class Housing:
                         'waterfront',
                         'sqft_above',
                         'sqft_basement',
+                        'view',
+                        'condition',
+                        'grade',
                         'yr_built',
                         'yr_renovated',
                         'sqft_living15',  # Compared to 15 nearest neighbors
@@ -59,8 +59,14 @@ class Housing:
 
         X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset.partition(X, y)
 
+        """
         my_svm = MySVM(random_state=42, num_features=num_features,
                        cat_features=cat_features)
         best_params = my_svm.tune_parameters(X_train, y_train)
+        """
 
+        my_dt = MyDT(random_state=42, num_features=num_features,
+                     cat_features=cat_features)
+        best_params = my_dt.tune_parameters(X_train, y_train)
+        print(best_params)
 
