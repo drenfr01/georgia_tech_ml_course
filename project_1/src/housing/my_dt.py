@@ -26,13 +26,15 @@ class MyDT:
         self.num_features = num_features
         self.cat_features = cat_features
 
-        self.unknown_level_name = 'unknown'
-        self.missing_level_name = 'missing'
+        self.unknown_level = -1
+        self.missing_level_name = -9999
 
     def _create_pipeline(self, X: pd.DataFrame, y: Optional[pd.Series],
                          training_or_scoring: str,
                          imputation_strategy: str = 'median',
                          fill_value = None) -> [pd.DataFrame, pd.Series]:
+
+        X[self.cat_features] = X[self.cat_features].astype('category')
 
         num_pipeline = Pipeline([
             ('imputer', SimpleImputer(strategy=imputation_strategy,
@@ -44,69 +46,29 @@ class MyDT:
         # Pandas categoricals apparently encode missing as -1 anyway
         # See https://medium.com/bigdatarepublic/integrating-pandas-and-scikit-learn-with-pipelines-f70eb6183696
         cat_pipeline = Pipeline([
-            ('missing', SimpleImputer(strategy="constant", fill_value=self.unknown_level_name)),
-            ('imputer', OrdinalEncoder())
+            ('missing', SimpleImputer(strategy="constant", fill_value=self.missing_level_name)),
+            ('imputer', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=self.unknown_level))
         ])
 
         full_pipeline = ColumnTransformer([
-            ("numeric", num_pipeline, self.num_features)
-   #         ("cat", cat_pipeline, self.cat_features)
+            ("numeric", num_pipeline, self.num_features),
+            ("cat", cat_pipeline, self.cat_features)
         ])
 
         if training_or_scoring == 'training':
 
             self.pipeline = full_pipeline
-            # create an unknown level for cat codes
-            X_handle_unk = self._create_novel_levels(X, self.cat_features)
 
-            # transform all object dtypes to categoricals because they are faster
-            X_handle_unk[self.cat_features] = X_handle_unk[self.cat_features].astype('category')
-
-            # we store the cat categories we want to use later
-            self.cat_codes_dict = {col: dict(enumerate(X_handle_unk[col].cat.categories))
-                                   for col in self.cat_features}
-
-            X_handle_unk[self.cat_features] = X_handle_unk[self.cat_features].astype(str)
-            self.pipeline = self.pipeline.fit(X_handle_unk)
+            self.pipeline = self.pipeline.fit(X)
             X = self.pipeline.transform(X)
 
         elif training_or_scoring == 'scoring':
-            X = self._handle_novel_levels(X, self.cat_features)
             X = self.pipeline.transform(X)
 
         else:
             raise ValueError("Please specify either 'training' or 'scoring")
 
         return X, y
-
-    def _create_novel_levels(self, X: pd.DataFrame, cat_attribs: pd.Index) -> pd.DataFrame:
-        # The idea here is to create a copy of the training dataset,
-        # add a new row, and then set all categoricals in new row to unknown
-        X_handle_unk = X.copy()
-        X_handle_unk = X_handle_unk.append(X.iloc[-1])
-
-        # have to reset index otherwise duplicates
-        X_handle_unk.reset_index(inplace=True)
-        X_handle_unk.drop(columns=['id'], axis=1, inplace=True)
-
-        X_handle_unk.loc[X_handle_unk.index[-1], cat_attribs] = self.unknown_level_name
-
-        return X_handle_unk
-
-    def _handle_novel_levels(self, X: pd.DataFrame, cat_attribs: pd.Index) -> pd.DataFrame:
-        # if a new level isn't present it will be mapped to N/A
-        # exactly like the 'unknown' value at training time
-        X[cat_attribs] = X[cat_attribs].astype('category')
-        for col in cat_attribs:
-            # TODO: I probably want to change this dictionary to only contain the specific categories in order
-            # So make it a list instead
-            cat_mappings = self.cat_codes_dict[col]
-
-            # fun fact: in Python 3.7 dicts keep insertion order!
-            t = pd.CategoricalDtype(categories=cat_mappings.values())
-            X[col] = X[col].astype(dtype=t)
-
-        return X
 
     def tune_parameters(self, X: pd.DataFrame, y: pd.Series) -> dict:
         """Runs k-fold validation to find the best parameters
@@ -139,13 +101,8 @@ class MyDT:
 
         self.clf = GridSearchCV(self.clf, parameters, scoring=('neg_mean_absolute_error',
                                                                'neg_root_mean_squared_error'),
-                                refit="neg_root_mean_squared_error", n_jobs=-1, verbose=1)
+                                refit="neg_root_mean_squared_error", n_jobs=-1, verbose=3)
 
         self.clf.fit(X, y)
 
-        best_params = self.clf.best_params_
-        # average_mae = -np.average(self.clf.cv_results_['mean_test_mean_absolute_error'])
-        # average_rmse = -np.average(self.clf.cv_results_['mean_test_root_mean_absolute_error'])
-        # best_params['scores'] = {"mae": average_mae, "rmse": average_rmse }
-
-        return best_params
+        return self.clf

@@ -67,6 +67,7 @@ class Housing:
 
         my_dt = MyDT(random_state=42, num_features=num_features,
                      cat_features=cat_features)
-        best_params = my_dt.tune_parameters(X_train, y_train)
-        print(best_params)
+        my_dt_clf = my_dt.tune_parameters(X_train, y_train)
+
+        print(my_dt_clf)
 
