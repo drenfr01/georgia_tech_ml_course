@@ -16,6 +16,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OrdinalEncoder
 
+from sklearn.model_selection import learning_curve, cross_validate
 
 class MyXGB:
     """ A class used to implement an XGBoost.
@@ -31,12 +32,9 @@ class MyXGB:
 
     Methods:
         fit: fits a GBM classifer using a training dataset and target
-        predict: returns a binary prediction
-        predict_proba: returns the probability of each binary class
-        evaluate: returns both an F1 and logloss score
         tune_parameters: uses k-fold cv and grid search to return a gbm trained on optimal hyperparams
     """
-    def __init__(self, random_state: int) -> None:
+    def __init__(self, random_state: int, num_features, cat_features) -> None:
         """
         :param random_state: ensures repeatable experiments & results
 
@@ -46,9 +44,12 @@ class MyXGB:
         self.random_state = random_state
         self.clf = xgb.XGBRegressor()
 
+        self.num_features = num_features
+        self.cat_features = cat_features
+
         self.cat_codes_dict = {}
-        self.unknown_level_name = 'unknown'
-        self.missing_level_name = 'missing'
+        self.unknown_level_name = -9999
+        self.missing_level_name = -1
 
     def fit(self, X: pd.DataFrame, y: pd.Series) -> xgb:
         """Fits a model to the provided features and target
@@ -81,15 +82,6 @@ class MyXGB:
         :return:
         """
 
-        # Transform feature datatypes
-        X['emp_length'] = pd.to_numeric(X['emp_length'], errors='coerce')
-
-        # Assemble pipeline
-        num_attribs = X.select_dtypes(include='number').columns
-        cat_attribs = X.select_dtypes(include='object').columns
-
-        X[cat_attribs] = X[cat_attribs].astype('category')
-
         # Note: for linear models would use add_indicator flag here
         num_pipeline = Pipeline([
             ('imputer', SimpleImputer(strategy=imputation_strategy))
@@ -100,79 +92,26 @@ class MyXGB:
         # on tree based algorithms
         cat_pipeline = Pipeline([
             ('missing', SimpleImputer(strategy="constant", fill_value=self.unknown_level_name)),
-            ('imputer', OrdinalEncoder())
+            ('imputer', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=self.unknown_level_name))
         ])
 
         full_pipeline = ColumnTransformer([
-            ("numeric", num_pipeline, num_attribs),
-            ("cat", cat_pipeline, cat_attribs)
+            ("numeric", num_pipeline, self.num_features),
+            ("cat", cat_pipeline, self.cat_features)
         ])
 
         if training_or_scoring == 'training':
             # Note: I might be able to handle setting this state in
             # a more elegant way
             self.pipeline = full_pipeline
-
-            # create an unknown level for cat codes
-            X_handle_unk = self._create_novel_levels(X, cat_attribs)
-
-            # transform all object dtypes to categoricals because they are faster
-            X_handle_unk[cat_attribs] = X_handle_unk[cat_attribs].astype('category')
-
-            # we store the cat categories we want to use later
-            self.cat_codes_dict = {col: dict(enumerate(X_handle_unk[col].cat.categories))
-                                   for col in cat_attribs}
-
-            self.pipeline = self.pipeline.fit(X_handle_unk)
-            X = self.pipeline.transform(X)
+            X = self.pipeline.fit_transform(X)
 
         elif training_or_scoring == 'scoring':
-            X = self._handle_novel_levels(X, cat_attribs)
             X = self.pipeline.transform(X)
         else:
             sys.exit("Please specify either 'training' or 'scoring'")
 
         return X, y
-
-    # TODO: put in input checking
-    def predict(self, X: pd.DataFrame) -> np.ndarray:
-        """Predict a binary target for a dataset
-
-        :param X: a pandas Dataframe of features for evaluation
-        :return: an ndarray of shape (len(X), 1) with a binary prediction
-        """
-
-        # Note: ensure that you only fit on training data otherwise
-        # you introduce target leakage for imputation
-        X, _ = self._run_preprocessing_pipeline(X, None, 'scoring')
-        return self.clf.predict(X)
-
-    # TODO: check input
-    def predict_proba(self, X: pd.DataFrame) -> np.ndarray:
-        """Predict the probability of each label
-
-        :param X: a pandas Dataframe of features for evaluation
-        :return: an ndarray of shape (len(X), 2) with probabilities for each class
-        """
-        X, _ = self._run_preprocessing_pipeline(X, None, 'scoring')
-        return self.clf.predict_proba(X)
-
-    # TODO: create input checking function that ensures length 1, etc.
-    def evaluate(self, X: pd.DataFrame, y: pd.Series) -> dict:
-        """Returns an F1 score and Logloss score
-
-        :param X: pandas dataframe of features
-        :param y: pandas series of targets
-        :return: dictionary with f1_score and logloss
-        """
-
-        y_pred_proba = self.predict_proba(X)
-        y_pred = self.predict(X)
-
-        my_log_loss = log_loss(y, y_pred_proba)
-        my_f1_score = f1_score(y, y_pred)
-
-        return {'f1_score': my_f1_score, 'logloss': my_log_loss}
 
     def tune_parameters(self, X: pd.DataFrame, y: pd.Series) -> dict:
         """Runs k-fold validation to find the best parameters
@@ -197,56 +136,52 @@ class MyXGB:
         min_samples_range = np.linspace(0.1, 1.0, 5, endpoint=True)
 
         parameters = {"learning_rate": [0.01, 0.05, 0.1, 0.3],
-                      "n_estimators": [10, 25, 50, 100],
                       "max_depth": [3, 5, 7],
                       "subsample": [0.8, 1.0],
-                      "min_samples_split": min_samples_range,
-                      "max_features": [sqrt_num_features, max_percent_features]
                       }
 
-        self.clf = GridSearchCV(self.clf, parameters, scoring=('neg_log_loss', "f1"),
-                                refit="neg_log_loss", n_jobs=-1, verbose=1)
+        self.clf = GridSearchCV(self.clf, parameters,
+                                scoring=('neg_mean_absolute_error', 'neg_root_mean_squared_error'),
+                                refit="neg_root_mean_squared_error", n_jobs=-1, verbose=3)
         self.clf.fit(X, y)
 
-        best_params = self.clf.best_params_
-        average_logloss = -np.average(self.clf.cv_results_['mean_test_neg_log_loss'])
-        average_f1 = np.average(self.clf.cv_results_['mean_test_f1'])
-        best_params['scores'] = {"f1_score": average_f1, "logloss": average_logloss}
+        cv_results = self.clf.cv_results_
+        results_df = pd.DataFrame({"params": cv_results['params'],
+                                   "mean_fit_time": cv_results['mean_fit_time'],
+                                   "mean_score_time": cv_results['mean_score_time'],
+                                   "mse_rank": cv_results['rank_test_neg_mean_absolute_error'],
+                                   "mse_results": cv_results['mean_test_neg_mean_absolute_error'],
+                                   "rmse_rank": cv_results['rank_test_neg_root_mean_squared_error'],
+                                   "rmse_results": cv_results['mean_test_neg_root_mean_squared_error']
+                                   })
 
-        return best_params
 
-    def _create_novel_levels(self, X: pd.DataFrame, cat_attribs: pd.Index) -> pd.DataFrame:
-        # The idea here is to create a copy of the training dataset,
-        # add a new row, and then set all categoricals in new row to unknown
-        X_handle_unk = X.copy()
-        X_handle_unk = X_handle_unk.append(X.iloc[-1])
+        return self.clf, results_df
 
-        # have to reset index otherwise duplicates
-        X_handle_unk.reset_index(inplace=True)
-        X_handle_unk.drop(columns=['Id'], axis=1, inplace=True)
+    def run_learning_curve(self, X, y, parameters):
 
-        X_handle_unk.loc[X_handle_unk.index[-1], cat_attribs] = self.unknown_level_name
+        clf = xgb.XGBRegressor(**parameters)
+        clf.fit(X,y)
 
-        return X_handle_unk
+        train_sizes, train_scores, valid_scores, \
+        fit_times, score_times = learning_curve(clf, X, y,
+                                                n_jobs=-1, verbose=3, shuffle=True,
+                                                scoring='neg_mean_absolute_error',
+                                                random_state=self.random_state,
+                                                return_times=True)
 
-    def _handle_novel_levels(self, X: pd.DataFrame, cat_attribs: pd.Index) -> pd.DataFrame:
-        # if a new level isn't present it will be mapped to N/A
-        # exactly like the 'unknown' value at training time
-        X[cat_attribs] = X[cat_attribs].astype('category')
-        for col in cat_attribs:
-            # TODO: I probably want to change this dictionary to only contain the specific categories in order
-            # So make it a list instead
-            cat_mappings = self.cat_codes_dict[col]
+        return train_sizes, np.mean(train_scores, axis=1), np.mean(valid_scores, axis=1), \
+               np.mean(fit_times, axis=1), np.mean(score_times, axis=1)
 
-            # fun fact: in Python 3.7 dicts keep insertion order!
-            t = pd.CategoricalDtype(categories=cat_mappings.values())
-            X[col] = X[col].astype(dtype=t)
+    def run_cv(self, X, y, parameters, k):
 
-        return X
+        clf = xgb.XGBRegressor(**parameters)
 
-    def get_mygbm_params(self):
-        """Getter to help with debugging
+        scores = cross_validate(clf, X, y,
+                                n_jobs=-1, verbose=3,
+                                scoring='neg_mean_absolute_error',
+                                cv=k, return_train_score=True)
 
-        :return: GBM parameters
-        """
-        return self.clf.get_params()
+
+        return {k: np.mean(v) for k, v in scores.items()}
+
