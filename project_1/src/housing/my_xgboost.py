@@ -129,11 +129,6 @@ class MyXGB:
         """
 
         X, _ = self._run_preprocessing_pipeline(X, y, "training")
-        num_features = X.shape[1]
-        sqrt_num_features = round(math.sqrt(num_features))
-        max_percent_features = round(0.4 * num_features)
-
-        min_samples_range = np.linspace(0.1, 1.0, 5, endpoint=True)
 
         parameters = {"learning_rate": [0.01, 0.05, 0.1, 0.3],
                       "max_depth": [3, 5, 7],
@@ -161,6 +156,7 @@ class MyXGB:
     def run_learning_curve(self, X, y, parameters):
 
         clf = xgb.XGBRegressor(**parameters)
+        X, _ = self._run_preprocessing_pipeline(X, y, "training")
         clf.fit(X,y)
 
         train_sizes, train_scores, valid_scores, \

@@ -71,10 +71,12 @@ class Housing:
     def run_xgb(self, X_train, y_train, num_features, cat_features):
         my_xgb = MyXGB(random_state=42, num_features=num_features,
                        cat_features=cat_features)
-        my_xgb_clf, results_df = my_xgb.tune_parameters(X_train, y_train)
-        results_df.to_csv("xgb_results_df.csv", index=False)
+        # my_xgb_clf, results_df = my_xgb.tune_parameters(X_train, y_train)
+        # results_df.to_csv("xgb_results_df.csv", index=False)
 
-        parameters = my_xgb_clf.best_params_
+        # parameters = my_xgb_clf.best_params_
+        parameters = {'learning_rate': 0.1, 'max_depth': 7, 'subsample': 1.0}
+
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_xgb.run_learning_curve(X_train, y_train, parameters)
 
