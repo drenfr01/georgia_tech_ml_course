@@ -3,6 +3,7 @@ from helper_files.data_munging_methods import DataMunge
 
 from housing.my_svm import MySVM
 from housing.my_dt import MyDT
+from housing.my_knn import MyKNN
 
 class Housing:
     def __init__(self):
@@ -40,6 +41,7 @@ class Housing:
 
         return cat_features, num_features, drop_features
 
+
     def run_housing(self):
         print("Running housing experiment")
         cat_features, num_features, drop_features = self.define_features()
@@ -63,11 +65,18 @@ class Housing:
         my_svm = MySVM(random_state=42, num_features=num_features,
                        cat_features=cat_features)
         best_params = my_svm.tune_parameters(X_train, y_train)
-        """
+
 
         my_dt = MyDT(random_state=42, num_features=num_features,
                      cat_features=cat_features)
         my_dt_clf = my_dt.tune_parameters(X_train, y_train)
+        """
 
-        print(my_dt_clf)
+        my_knn = MyKNN(random_state=42, num_features=num_features,
+                     cat_features=cat_features)
+        # my_knn_clf = my_knn.tune_parameters(X_train, y_train)
 
+        parameters = {"n_neighbors": 5, "weights": "uniform"}
+        train_sizes, train_scores, valid_scores,  \
+            fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
+        return my_knn_clf
