@@ -15,11 +15,11 @@ class Housing:
     def define_features(self):
         # See https://www.slideshare.net/PawanShivhare1/predicting-king-county-house-prices
         # for data dictionary
-        drop_features = ['lat', 'long']
+        drop_features = ['zipcode']
 
         # Note: view, condition, and grade could all be categorical as well
         # TODO: play around with different representations?
-        cat_features = ['zipcode']
+        cat_features = []
 
         # TODO: engineer features for price differences between prices?
         num_features = ['bedrooms',
@@ -36,7 +36,9 @@ class Housing:
                         'yr_built',
                         'yr_renovated',
                         'sqft_living15',  # Compared to 15 nearest neighbors
-                        'sqft_lot15'
+                        'sqft_lot15',
+                        'lat',
+                        'long'
                         ]
 
         return cat_features, num_features, drop_features
@@ -72,10 +74,11 @@ class Housing:
         my_dt_clf = my_dt.tune_parameters(X_train, y_train)
         """
 
+        print("Dataset size: ", X_train.shape)
         my_knn = MyKNN(random_state=42, num_features=num_features,
                      cat_features=cat_features)
-        # my_knn_clf = my_knn.tune_parameters(X_train, y_train)
-
+        my_knn_clf, results_df = my_knn.tune_parameters(X_train, y_train)
+        results_df.to_csv("results_df.csv", index=False)
         parameters = {"n_neighbors": 5, "weights": "uniform"}
         """
         train_sizes, train_scores, valid_scores,  \

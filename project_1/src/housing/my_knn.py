@@ -47,7 +47,7 @@ class MyKNN:
 
         full_pipeline = ColumnTransformer([
             ("numeric", num_pipeline, self.num_features),
-            ("cat", cat_pipeline, ['zipcode'])
+            ("cat", cat_pipeline, self.cat_features)
         ])
 
         if training_or_scoring == 'training':
@@ -79,7 +79,7 @@ class MyKNN:
 
         X, _ = self._create_pipeline(X, y, "training")
 
-        parameters = {"n_neighbors": [1,3,5,7,9],
+        parameters = {"n_neighbors": [1, 5, 10, 25, 50, 100],
                       "weights": ['uniform', 'distance']
                       }
 
@@ -89,7 +89,18 @@ class MyKNN:
 
         self.clf.fit(X, y)
 
-        return self.clf
+        cv_results = self.clf.cv_results_
+        results_df = pd.DataFrame({"params": cv_results['params'],
+                                   "mean_fit_time": cv_results['mean_fit_time'],
+                                   "mean_score_time": cv_results['mean_score_time'],
+                                   "mse_rank": cv_results['rank_test_neg_mean_absolute_error'],
+                                   "mse_results": cv_results['mean_test_neg_mean_absolute_error'],
+                                   "rmse_rank": cv_results['rank_test_neg_root_mean_squared_error'],
+                                   "rmse_results": cv_results['mean_test_neg_root_mean_squared_error']
+                                   })
+
+
+        return self.clf, results_df
 
     def run_learning_curve(self, X, y, parameters):
 
