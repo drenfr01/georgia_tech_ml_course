@@ -77,9 +77,12 @@ class Housing:
         print("Dataset size: ", X_train.shape)
         my_knn = MyKNN(random_state=42, num_features=num_features,
                      cat_features=cat_features)
+        """
         my_knn_clf, results_df = my_knn.tune_parameters(X_train, y_train)
         results_df.to_csv("results_df.csv", index=False)
-        parameters = {"n_neighbors": 5, "weights": "uniform"}
+        """
+
+        parameters = {'metric': 'manhattan', 'n_neighbors': 10, 'weights': 'distance'}
         """
         train_sizes, train_scores, valid_scores,  \
             fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
@@ -87,5 +90,4 @@ class Housing:
 
         results = my_knn.run_cv( X, y, parameters, 5)
 
-        # TODO: write all results to a nice dataframe then csv
         return my_knn_clf

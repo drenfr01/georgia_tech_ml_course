@@ -80,7 +80,8 @@ class MyKNN:
         X, _ = self._create_pipeline(X, y, "training")
 
         parameters = {"n_neighbors": [1, 5, 10, 25, 50, 100],
-                      "weights": ['uniform', 'distance']
+                      "weights": ['uniform', 'distance'],
+                      "metric": ['euclidean', 'manhattan', 'mahalanobis']
                       }
 
         self.clf = GridSearchCV(self.clf, parameters,
