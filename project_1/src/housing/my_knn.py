@@ -115,5 +115,6 @@ class MyKNN:
                                 scoring='neg_mean_absolute_error',
                                 cv=k, return_train_score=True)
 
-        return scores
+
+        return {k: np.mean(v) for k, v in scores.items()}
 

@@ -82,7 +82,7 @@ class Housing:
             fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
         """
 
-        my_knn.run_cv( X, y, parameters, 5)
+        results = my_knn.run_cv( X, y, parameters, 5)
 
         # TODO: write all results to a nice dataframe then csv
         return my_knn_clf
