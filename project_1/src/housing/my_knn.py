@@ -14,7 +14,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.model_selection import learning_curve
+from sklearn.model_selection import learning_curve, cross_validate
 
 from sklearn.neighbors import KNeighborsRegressor
 
@@ -103,6 +103,17 @@ class MyKNN:
                                                     random_state=self.random_state,
                                                     return_times=True)
 
-        # TODO: return average train & test scores for each learning partition
         return train_sizes, np.mean(train_scores, axis=1), np.mean(valid_scores, axis=1),  \
                np.mean(fit_times, axis=1), np.mean(score_times, axis=1)
+
+    def run_cv(self, X, y, parameters, k):
+
+        clf = KNeighborsRegressor(**parameters)
+
+        scores = cross_validate(clf, X, y,
+                                n_jobs=-1, verbose=3,
+                                scoring='neg_mean_absolute_error',
+                                cv=k, return_train_score=True)
+
+        return scores
+

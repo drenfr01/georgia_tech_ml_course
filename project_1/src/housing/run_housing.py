@@ -77,6 +77,12 @@ class Housing:
         # my_knn_clf = my_knn.tune_parameters(X_train, y_train)
 
         parameters = {"n_neighbors": 5, "weights": "uniform"}
+        """
         train_sizes, train_scores, valid_scores,  \
             fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
+        """
+
+        my_knn.run_cv( X, y, parameters, 5)
+
+        # TODO: write all results to a nice dataframe then csv
         return my_knn_clf
