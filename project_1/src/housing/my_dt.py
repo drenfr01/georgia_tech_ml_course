@@ -16,6 +16,8 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 
 from sklearn import tree
+import matplotlib.pyplot as plt
+
 
 class MyDT:
     def __init__(self, random_state: int, num_features, cat_features) -> None:
@@ -27,12 +29,12 @@ class MyDT:
         self.cat_features = cat_features
 
         self.unknown_level = -1
-        self.missing_level_name = -9999
+        self.missing_level = -9999
 
     def _create_pipeline(self, X: pd.DataFrame, y: Optional[pd.Series],
                          training_or_scoring: str,
                          imputation_strategy: str = 'median',
-                         fill_value = None) -> [pd.DataFrame, pd.Series]:
+                         fill_value=None) -> [pd.DataFrame, pd.Series]:
 
         X[self.cat_features] = X[self.cat_features].astype('category')
 
@@ -46,7 +48,7 @@ class MyDT:
         # Pandas categoricals apparently encode missing as -1 anyway
         # See https://medium.com/bigdatarepublic/integrating-pandas-and-scikit-learn-with-pipelines-f70eb6183696
         cat_pipeline = Pipeline([
-            ('missing', SimpleImputer(strategy="constant", fill_value=self.missing_level_name)),
+            ('missing', SimpleImputer(strategy="constant", fill_value=self.missing_level)),
             ('imputer', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=self.unknown_level))
         ])
 
@@ -58,9 +60,7 @@ class MyDT:
         if training_or_scoring == 'training':
 
             self.pipeline = full_pipeline
-
-            self.pipeline = self.pipeline.fit(X)
-            X = self.pipeline.transform(X)
+            X = self.pipeline.fit_transform(X)
 
         elif training_or_scoring == 'scoring':
             X = self.pipeline.transform(X)
@@ -87,16 +87,12 @@ class MyDT:
 
         X, _ = self._create_pipeline(X, y, "training",
                                      "constant", -9999)
-        num_features = X.shape[1]
-        sqrt_num_features = round(math.sqrt(num_features))
-        max_percent_features = round(0.4 * num_features)
-
-        min_samples_range = np.linspace(0.1, 1.0, 5, endpoint=True)
 
         parameters = {"criterion": ['mse', 'friedman_mse'],
                       "max_features": ['auto', 'sqrt'],
-                      "max_depth": [3, 5, 7, 11],
-                      "ccp_alpha": [0.0, 0.1, 0.3, 0.5]
+                      "max_depth": [3, 5, 9, 15, 25],
+                      "min_samples_leaf": [1, 3, 5, 10, 25]
+                      # "ccp_alpha": [0.0, 0.1, 0.3, 0.5]
                       }
 
         self.clf = GridSearchCV(self.clf, parameters, scoring=('neg_mean_absolute_error',
@@ -105,4 +101,45 @@ class MyDT:
 
         self.clf.fit(X, y)
 
-        return self.clf
+        cv_results = self.clf.cv_results_
+        results_df = pd.DataFrame({"params": cv_results['params'],
+                                   "mean_fit_time": cv_results['mean_fit_time'],
+                                   "mean_score_time": cv_results['mean_score_time'],
+                                   "mse_rank": cv_results['rank_test_neg_mean_absolute_error'],
+                                   "mse_results": cv_results['mean_test_neg_mean_absolute_error'],
+                                   "rmse_rank": cv_results['rank_test_neg_root_mean_squared_error'],
+                                   "rmse_results": cv_results['mean_test_neg_root_mean_squared_error']
+                                   })
+
+        return self.clf, results_df
+
+
+    def prune_tree(self, parameters, X_train, y_train, X_valid, y_valid):
+        # Following code adapted from sklearn documentation for pruning
+        # https://scikit-learn.org/stable/auto_examples/tree/plot_cost_complexity_pruning.html
+
+        print("Decision Tree Parameters: ", parameters)
+        clf = tree.DecisionTreeRegressor(**parameters)
+        path = clf.cost_complexity_pruning_path(X_train, y_train)
+        ccp_alphas, impurities = path.ccp_alphas, path.impurities
+
+        clfs = []
+        for ccp_alpha in ccp_alphas:
+            parameters['ccp_alpha'] = ccp_alpha
+            clf = tree.DecisionTreeRegressor(**parameters)
+            clf.fit(X_train, y_train)
+            clfs.append(clf)
+
+        train_scores = [clf.score(X_train, y_train) for clf in clfs]
+        test_scores = [clf.score(X_valid, y_valid) for clf in clfs]
+
+        fig, ax = plt.subplots()
+        ax.set_xlabel("alpha")
+        ax.set_ylabel("accuracy")
+        ax.set_title("Accuracy vs alpha for training and testing sets")
+        ax.plot(ccp_alphas, train_scores, marker='o', label="train",
+                drawstyle="steps-post")
+        ax.plot(ccp_alphas, test_scores, marker='o', label="test",
+                drawstyle="steps-post")
+        ax.legend()
+        plt.show()

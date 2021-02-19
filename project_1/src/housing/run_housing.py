@@ -17,11 +17,11 @@ class Housing:
     def define_features(self):
         # See https://www.slideshare.net/PawanShivhare1/predicting-king-county-house-prices
         # for data dictionary
-        drop_features = ['lat', 'long']
+        drop_features = ['zipcode']
 
         # Note: view, condition, and grade could all be categorical as well
         # TODO: play around with different representations?
-        cat_features = ['zipcode']
+        cat_features = []
 
         # TODO: engineer features for price differences between prices?
         num_features = ['bedrooms',
@@ -39,14 +39,30 @@ class Housing:
                         'yr_renovated',
                         'sqft_living15',  # Compared to 15 nearest neighbors
                         'sqft_lot15',
+                        'lat',
+                        'long'
                         ]
 
         return cat_features, num_features, drop_features
 
-    def run_dt(self, X_train, y_train, num_features, cat_features):
+    def run_dt(self, X_train, y_train, X_valid, y_valid, num_features, cat_features):
         my_dt = MyDT(random_state=42, num_features=num_features,
                      cat_features=cat_features)
-        my_dt_clf = my_dt.tune_parameters(X_train, y_train)
+
+        my_dt_clf, results_df = my_dt.tune_parameters(X_train, y_train)
+        results_df.to_csv("dt_results_df.csv", index=False)
+
+        my_dt.prune_tree(my_dt_clf.best_params_, X_train, y_train, X_valid, y_valid)
+
+        """
+        parameters = my_knn_clf.best_params_
+        train_sizes, train_scores, valid_scores, \
+        fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
+
+        results = my_knn.run_cv( X_train, y_train, parameters, 5)
+
+        return my_knn_clf
+        """
 
     def run_svm(self, X_train, y_train, num_features, cat_features):
         my_svm = MySVM(random_state=42, num_features=num_features,
@@ -105,4 +121,4 @@ class Housing:
 
         print("Dataset size: ", X_train.shape)
 
-        self.run_xgb(X_train, y_train, num_features, cat_features)
+        self.run_dt(X_train, y_train, X_valid, y_valid, num_features, cat_features)
