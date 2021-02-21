@@ -80,8 +80,24 @@ class Housing:
     def run_svm(self, X_train, y_train, num_features, cat_features):
         my_svm = MySVM(random_state=42, num_features=num_features,
                        cat_features=cat_features)
+        """
         my_svm_clf, results_df = my_svm.tune_parameters(X_train, y_train)
         results_df.to_csv("svm_results_df.csv", index=False)
+        """
+
+        parameters = {"kernel": 'linear', "C": 10}
+        print("Staring learning curve")
+        train_sizes, train_scores, valid_scores, \
+        fit_times, score_times = my_svm.run_learning_curve(X_train, y_train, parameters)
+
+        learning_curve_dt = pd.DataFrame({"train_sizes": train_sizes,
+                                          "train_scores": train_scores,
+                                          "valid_scores": valid_scores,
+                                          "fit_times": fit_times,
+                                          "score_times": score_times})
+
+        learning_curve_dt.to_csv("svm_learning_curve_results.csv", index=False)
+
 
     def run_knn(self, X_train, y_train, X_valid, y_valid,  num_features, cat_features):
 
@@ -120,13 +136,20 @@ class Housing:
 
         parameters = my_xgb_clf.best_params_
         """
-        """
-        parameters = {'learning_rate': 0.1, 'max_depth': 7, 'subsample': 1.0}
+        parameters = {'max_depth': 6}
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_xgb.run_learning_curve(X_train, y_train, parameters)
 
-        results = my_xgb.run_cv( X_train, y_train, parameters, 5)
+        learning_curve_dt = pd.DataFrame({"train_sizes": train_sizes,
+                                          "train_scores": train_scores,
+                                          "valid_scores": valid_scores,
+                                          "fit_times": fit_times,
+                                          "score_times": score_times})
+
+        learning_curve_dt.to_csv("xgb_learning_curve_results.csv", index=False)
+
         """
+        results = my_xgb.run_cv( X_train, y_train, parameters, 5)
 
         parameters={"random_state": 42}
         exp_results = my_xgb.run_learning_iteration_curve(X_train, y_train, X_valid, y_valid, parameters)
@@ -135,6 +158,7 @@ class Housing:
                                             "validation": exp_results['validation_1']['mae']})
         iterations_curve_df.to_csv("xgb_iterations_curve_results.csv", index=True)
         # return my_xgb_clf
+        """
 
     def run_housing(self):
         print("Running housing experiment")
@@ -157,4 +181,4 @@ class Housing:
 
         print("Dataset size: ", X_train.shape)
 
-        self.run_xgb(X_train, y_train, X_valid, y_valid, num_features, cat_features)
+        self.run_svm(X_train, y_train, num_features, cat_features)
