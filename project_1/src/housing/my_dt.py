@@ -14,9 +14,11 @@ from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OrdinalEncoder, StandardScaler
+from sklearn.model_selection import learning_curve
 
 from sklearn import tree
 import matplotlib.pyplot as plt
+from sklearn.metrics import mean_absolute_error
 
 
 class MyDT:
@@ -88,10 +90,10 @@ class MyDT:
         X, _ = self._create_pipeline(X, y, "training",
                                      "constant", -9999)
 
-        parameters = {"criterion": ['mse', 'friedman_mse'],
-                      "max_features": ['auto', 'sqrt'],
-                      "max_depth": [3, 5, 9, 15, 25],
-                      "min_samples_leaf": [1, 3, 5, 10, 25]
+        parameters = {# "criterion": ['mse', 'friedman_mse'],
+                      # "max_features": ['auto', 'sqrt'],
+                      # "max_depth": [1, 3, 5, 9, 15, 25, 100],
+                       "min_samples_leaf": [1, 3, 5, 10, 15, 25, 50, 100, 1000]
                       # "ccp_alpha": [0.0, 0.1, 0.3, 0.5]
                       }
 
@@ -105,8 +107,8 @@ class MyDT:
         results_df = pd.DataFrame({"params": cv_results['params'],
                                    "mean_fit_time": cv_results['mean_fit_time'],
                                    "mean_score_time": cv_results['mean_score_time'],
-                                   "mse_rank": cv_results['rank_test_neg_mean_absolute_error'],
-                                   "mse_results": cv_results['mean_test_neg_mean_absolute_error'],
+                                   "mae_rank": cv_results['rank_test_neg_mean_absolute_error'],
+                                   "mae_results": cv_results['mean_test_neg_mean_absolute_error'],
                                    "rmse_rank": cv_results['rank_test_neg_root_mean_squared_error'],
                                    "rmse_results": cv_results['mean_test_neg_root_mean_squared_error']
                                    })
@@ -130,16 +132,33 @@ class MyDT:
             clf.fit(X_train, y_train)
             clfs.append(clf)
 
-        train_scores = [clf.score(X_train, y_train) for clf in clfs]
-        test_scores = [clf.score(X_valid, y_valid) for clf in clfs]
+        print("Number of nodes in the last tree is: {} with ccp_alpha: {}".format(
+            clfs[-1].tree_.node_count, ccp_alphas[-1]))
+        train_scores = [mean_absolute_error(clf.predict(X_train), y_train) for clf in clfs]
+        test_scores = [mean_absolute_error(clf.predict(X_valid), y_valid) for clf in clfs]
 
         fig, ax = plt.subplots()
         ax.set_xlabel("alpha")
-        ax.set_ylabel("accuracy")
-        ax.set_title("Accuracy vs alpha for training and testing sets")
+        ax.set_ylabel("MAE")
+        ax.set_title("MAE vs alpha for training and testing sets")
         ax.plot(ccp_alphas, train_scores, marker='o', label="train",
                 drawstyle="steps-post")
         ax.plot(ccp_alphas, test_scores, marker='o', label="test",
                 drawstyle="steps-post")
         ax.legend()
         plt.show()
+
+    def run_learning_curve(self, X, y, parameters):
+
+        clf = tree.DecisionTreeRegressor(**parameters)
+        clf.fit(X,y)
+
+        train_sizes, train_scores, valid_scores, \
+        fit_times, score_times = learning_curve(clf, X, y,
+                                                n_jobs=-1, verbose=3, shuffle=True,
+                                                scoring='neg_mean_absolute_error',
+                                                random_state=self.random_state,
+                                                return_times=True)
+
+        return train_sizes, np.mean(train_scores, axis=1), np.mean(valid_scores, axis=1), \
+               np.mean(fit_times, axis=1), np.mean(score_times, axis=1)

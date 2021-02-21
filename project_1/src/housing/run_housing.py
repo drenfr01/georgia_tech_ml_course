@@ -6,6 +6,7 @@ from housing.my_dt import MyDT
 from housing.my_knn import MyKNN
 from housing.my_xgboost import MyXGB
 
+import pandas as pd
 
 class Housing:
     def __init__(self):
@@ -52,7 +53,19 @@ class Housing:
         my_dt_clf, results_df = my_dt.tune_parameters(X_train, y_train)
         results_df.to_csv("dt_results_df.csv", index=False)
 
-        my_dt.prune_tree(my_dt_clf.best_params_, X_train, y_train, X_valid, y_valid)
+        # my_dt.prune_tree(my_dt_clf.best_params_, X_train, y_train, X_valid, y_valid)
+
+        parameters = {"min_samples_leaf": 10}
+        train_sizes, train_scores, valid_scores, \
+        fit_times, score_times = my_dt.run_learning_curve(X_train, y_train, parameters)
+
+        learning_curve_dt = pd.DataFrame({"train_sizes": train_sizes,
+                                          "train_scores": train_scores,
+                                          "valid_scores": valid_scores,
+                                          "fit_times": fit_times,
+                                          "score_times": score_times})
+        learning_curve_dt.to_csv("dt_learning_curve_results.csv", index=False)
+
 
         """
         parameters = my_knn_clf.best_params_
@@ -70,36 +83,58 @@ class Housing:
         my_svm_clf, results_df = my_svm.tune_parameters(X_train, y_train)
         results_df.to_csv("svm_results_df.csv", index=False)
 
-    def run_knn(self, X_train, y_train, num_features, cat_features):
+    def run_knn(self, X_train, y_train, X_valid, y_valid,  num_features, cat_features):
 
         my_knn = MyKNN(random_state=42, num_features=num_features,
                        cat_features=cat_features)
+        """
         my_knn_clf, results_df = my_knn.tune_parameters(X_train, y_train)
         results_df.to_csv("knn_results_df.csv", index=False)
-
         parameters = my_knn_clf.best_params_
+        print('Best parameters', parameters)
+        """
+
+        parameters = {"n_neighbors": 10, "metric": "euclidean"}
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
 
-        results = my_knn.run_cv( X_train, y_train, parameters, 5)
+        learning_curve_dt = pd.DataFrame({"train_sizes": train_sizes,
+                                          "train_scores": train_scores,
+                                          "valid_scores": valid_scores,
+                                          "fit_times": fit_times,
+                                          "score_times": score_times})
 
-        return my_knn_clf
+        learning_curve_dt.to_csv("knn_learning_curve_results.csv", index=False)
 
-    def run_xgb(self, X_train, y_train, num_features, cat_features):
+        # results = my_knn.run_cv( X_train, y_train, parameters, 5)
+
+        # return my_knn_clf
+
+    def run_xgb(self, X_train, y_train, X_valid, y_valid, num_features, cat_features):
         my_xgb = MyXGB(random_state=42, num_features=num_features,
                        cat_features=cat_features)
-        # my_xgb_clf, results_df = my_xgb.tune_parameters(X_train, y_train)
-        # results_df.to_csv("xgb_results_df.csv", index=False)
 
-        # parameters = my_xgb_clf.best_params_
+        """
+        my_xgb_clf, results_df = my_xgb.tune_parameters(X_train, y_train)
+        results_df.to_csv("xgb_results_df.csv", index=False)
+
+        parameters = my_xgb_clf.best_params_
+        """
+        """
         parameters = {'learning_rate': 0.1, 'max_depth': 7, 'subsample': 1.0}
-
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_xgb.run_learning_curve(X_train, y_train, parameters)
 
         results = my_xgb.run_cv( X_train, y_train, parameters, 5)
+        """
 
-        return my_xgb_clf
+        parameters={"random_state": 42}
+        exp_results = my_xgb.run_learning_iteration_curve(X_train, y_train, X_valid, y_valid, parameters)
+
+        iterations_curve_df = pd.DataFrame({"training": exp_results["validation_0"]['mae'],
+                                            "validation": exp_results['validation_1']['mae']})
+        iterations_curve_df.to_csv("xgb_iterations_curve_results.csv", index=True)
+        # return my_xgb_clf
 
     def run_housing(self):
         print("Running housing experiment")
@@ -122,4 +157,4 @@ class Housing:
 
         print("Dataset size: ", X_train.shape)
 
-         self.run_dt(X_train, y_train, num_features, cat_features)
+        self.run_xgb(X_train, y_train, X_valid, y_valid, num_features, cat_features)

@@ -88,10 +88,10 @@ class MyDT:
         X, _ = self._create_pipeline(X, y, "training",
                                      "constant", -9999)
 
-        parameters = {"criterion": ['mse', 'friedman_mse'],
-                      "max_features": ['auto', 'sqrt'],
-                      "max_depth": [3, 5, 9, 15, 25],
-                      "min_samples_leaf": [1, 3, 5, 10, 25]
+        parameters = {#"criterion": ['mse', 'friedman_mse'],
+                      #"max_features": ['auto', 'sqrt'],
+                      "max_depth": [1, 3, 5, 9, 15, 25],
+                      #min_samples_leaf": [1, 3, 5, 10, 25]
                       # "ccp_alpha": [0.0, 0.1, 0.3, 0.5]
                       }
 

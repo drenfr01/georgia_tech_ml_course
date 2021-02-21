@@ -130,9 +130,9 @@ class MyXGB:
 
         X, _ = self._run_preprocessing_pipeline(X, y, "training")
 
-        parameters = {"learning_rate": [0.01, 0.05, 0.1, 0.3],
-                      "max_depth": [3, 5, 7],
-                      "subsample": [0.8, 1.0],
+        parameters = {# "learning_rate": [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0],
+                      # "max_depth": [1, 3, 5, 9, 15, 25, 100],
+                      "subsample": [0.1, 0.3, 0.5, 0.7, 0.9, 1.0],
                       }
 
         self.clf = GridSearchCV(self.clf, parameters,
@@ -181,3 +181,15 @@ class MyXGB:
 
         return {k: np.mean(v) for k, v in scores.items()}
 
+    def run_learning_iteration_curve(self, X_train, y_train, X_valid, y_valid, parameters):
+        clf = xgb.XGBRegressor(**parameters)
+
+        # Code example influenced by
+        # https://machinelearningmastery.com/avoid-overfitting-by-early-stopping-with-xgboost-in-python/
+        data_set = [(X_train, y_train), (X_valid, y_valid)]
+
+        clf.fit(X_train, y_train, eval_metric=['mae'], eval_set=data_set)
+
+        exp_results = clf.evals_result()
+
+        return exp_results
