@@ -67,7 +67,8 @@ class Housing:
     def run_svm(self, X_train, y_train, num_features, cat_features):
         my_svm = MySVM(random_state=42, num_features=num_features,
                        cat_features=cat_features)
-        best_params = my_svm.tune_parameters(X_train, y_train)
+        my_svm_clf, results_df = my_svm.tune_parameters(X_train, y_train)
+        results_df.to_csv("svm_results_df.csv", index=False)
 
     def run_knn(self, X_train, y_train, num_features, cat_features):
 
@@ -121,4 +122,4 @@ class Housing:
 
         print("Dataset size: ", X_train.shape)
 
-        self.run_dt(X_train, y_train, X_valid, y_valid, num_features, cat_features)
+         self.run_dt(X_train, y_train, num_features, cat_features)
