@@ -6,7 +6,5 @@ if __name__ == '__main__':
     my_lemon = Lemons()
     my_lemon.run_lemons()
 
-    """
     my_housing = Housing()
     my_housing.run_housing()
-    """
