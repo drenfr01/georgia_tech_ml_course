@@ -1,3 +1,5 @@
+import pandas as pd
+
 from helper_files.helper_methods import LoadDataset
 from helper_files.data_munging_methods import DataMunge
 
@@ -5,6 +7,7 @@ from lemons.my_svm import MySVM
 from lemons.my_dt import MyDT
 from lemons.my_knn import MyKNN
 from lemons.my_xgboost import MyXGB
+
 
 class Lemons:
     def __init__(self):
@@ -14,26 +17,22 @@ class Lemons:
         self.target = "IsBadBuy"
 
     def define_features(self) -> tuple[list, list, list]:
-        drop_features = ['WheelTypeID']
+        drop_features = ['WheelTypeID', 'WheelType']
 
         cat_features = ['Auction',
                         'VehYear',
                         'Make',
                         'Model',
-                        'Trim',
                         'SubModel',
                         'Color',
                         'Transmission',
-                        'WheelType',
                         'Nationality',
                         'Size',
-                        'TopThreeAmericanName',
                         'PRIMEUNIT',
                         'AUCGUART',
                         'BYRNO',
                         'VNZIP1',
                         'VNST',  # TODO potentially redundant
-                        'WarrantyCost'
                         ]
 
         # TODO: engineer features for price differences between prices?
@@ -57,12 +56,14 @@ class Lemons:
         my_dt = MyDT(random_state=42, num_features=num_features,
                      cat_features=cat_features)
 
-        my_dt_clf, results_df = my_dt.tune_parameters(X_train, y_train)
-        results_df.to_csv("dt_results_df.csv", index=False)
 
-        # my_dt.prune_tree(my_dt_clf.best_params_, X_train, y_train, X_valid, y_valid)
+        # my_dt_clf, results_df = my_dt.tune_parameters(X_train, y_train)
+        # results_df.to_csv("dt_results_df.csv", index=False)
 
-        parameters = {"min_samples_leaf": 10}
+
+        parameters = {"max_depth": 5}
+        # my_dt.prune_tree(parameters, X_train, y_train, X_valid, y_valid)
+        # print("Best params: ", my_dt_clf.best_params_)
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_dt.run_learning_curve(X_train, y_train, parameters)
 
@@ -74,15 +75,6 @@ class Lemons:
         learning_curve_dt.to_csv("dt_learning_curve_results.csv", index=False)
 
 
-        """
-        parameters = my_knn_clf.best_params_
-        train_sizes, train_scores, valid_scores, \
-        fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
-
-        results = my_knn.run_cv( X_train, y_train, parameters, 5)
-
-        return my_knn_clf
-        """
 
     def run_svm(self, X_train, y_train, num_features, cat_features):
         my_svm = MySVM(random_state=42, num_features=num_features,
@@ -184,9 +176,11 @@ class Lemons:
 
         num_features.extend(new_datepart_features)
 
-        X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset.partition(X, y, test_percentage=50)
+        X_train, X_valid, X_test, y_train, y_valid, y_test = load_dataset.partition(X, y, test_percentage=0.6, val_percentage=0.2)
 
         print(X_train.shape)
+
+        self.run_dt(X_train, y_train, X_valid, y_valid, num_features, cat_features)
 
         """
         nn = MyNet(input_size=len(num_features), num_epochs=10, batch_size=128,
