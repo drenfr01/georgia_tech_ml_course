@@ -85,7 +85,7 @@ class Housing:
         results_df.to_csv("svm_results_df.csv", index=False)
         """
 
-        parameters = {"kernel": 'linear', "C": 10}
+        parameters = {"kernel": 'linear', "C": 25}
         print("Staring learning curve")
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_svm.run_learning_curve(X_train, y_train, parameters)
