@@ -13,23 +13,23 @@ from sklearn.model_selection import GridSearchCV, learning_curve
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OrdinalEncoder, StandardScaler
 
 from sklearn.kernel_approximation import Nystroem
 from sklearn import svm
-from sklearn.svm import SVR
 
 
 class MySVM:
     def __init__(self, random_state: int, num_features, cat_features) -> None:
         self.random_state = random_state
 
-        self.clf = svm.SVR(cache_size=1000)
+        self.clf = svm.SVC(cache_size=1000, probability=True)
 
         self.num_features = num_features
         self.cat_features = cat_features
 
-        self.missing_level_name = 'missing'
+        self.missing_level = "Missing"
+        self.unknown_level = -1
 
     def _create_pipeline(self, X: pd.DataFrame, y: Optional[pd.Series],
                          training_or_scoring: str,
@@ -43,7 +43,8 @@ class MySVM:
         # Pandas categoricals apparently encode missing as -1 anyway
         # See https://medium.com/bigdatarepublic/integrating-pandas-and-scikit-learn-with-pipelines-f70eb6183696
         cat_pipeline = Pipeline([
-            ('imputer', OneHotEncoder(handle_unknown='ignore'))
+            ('missing', SimpleImputer(strategy="constant", fill_value=self.missing_level)),
+            ('imputer', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=self.unknown_level))
         ])
 
         full_pipeline = ColumnTransformer([
@@ -83,13 +84,11 @@ class MySVM:
 
         X, _ = self._create_pipeline(X, y, "training")
 
-        parameters = {"kernel": ['linear'],
-                      "C": [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 25, 100]
+        parameters = {"kernel": ['linear', 'poly', 'rbf'],
+                      # "C": [0.01, 0.1, 0.5, 1.0, 5.0, 10.0, 25, 100]
                       }
 
-        self.clf = GridSearchCV(self.clf, parameters, scoring=('neg_mean_absolute_error',
-                                                               'neg_root_mean_squared_error'),
-                                refit="neg_root_mean_squared_error", n_jobs=-1, verbose=3)
+        self.clf = GridSearchCV(self.clf, parameters, scoring='neg_log_loss', n_jobs=-1, verbose=3)
         # Use Nystroem approximation to reduce training time
         # See https://scikit-learn.org/stable/modules/generated/sklearn.kernel_approximation.Nystroem.html
 
@@ -105,23 +104,22 @@ class MySVM:
         results_df = pd.DataFrame({"params": cv_results['params'],
                                    "mean_fit_time": cv_results['mean_fit_time'],
                                    "mean_score_time": cv_results['mean_score_time'],
-                                   "mse_rank": cv_results['rank_test_neg_mean_absolute_error'],
-                                   "mse_results": cv_results['mean_test_neg_mean_absolute_error'],
-                                   "rmse_rank": cv_results['rank_test_neg_root_mean_squared_error'],
-                                   "rmse_results": cv_results['mean_test_neg_root_mean_squared_error']
+                                   "logloss_rank": cv_results['rank_test_score'],
+                                   "logloss_results": cv_results['mean_test_score'],
                                    })
 
         return self.clf, results_df
 
     def run_learning_curve(self, X, y, parameters):
 
-        clf = svm.SVR(**parameters)
+        X, _ = self._create_pipeline(X, y, "training")
+        clf = svm.SVC(**parameters)
         clf.fit(X,y)
 
         train_sizes, train_scores, valid_scores, \
             fit_times, score_times = learning_curve(clf, X, y,
                                                 n_jobs=-1, verbose=3, shuffle=True,
-                                                scoring='neg_mean_absolute_error',
+                                                scoring='neg_log_loss',
                                                 random_state=self.random_state,
                                                 return_times=True)
 

@@ -16,19 +16,19 @@ from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.model_selection import learning_curve, cross_validate
 
-from sklearn.neighbors import KNeighborsRegressor
+from sklearn.neighbors import KNeighborsClassifier
 
 
 class MyKNN:
     def __init__(self, random_state: int, num_features, cat_features) -> None:
         self.random_state = random_state
 
-        self.clf = KNeighborsRegressor(n_jobs=-1)
+        self.clf = KNeighborsClassifier(n_jobs=-1)
 
         self.num_features = num_features
         self.cat_features = cat_features
 
-        self.missing_level = -9999
+        self.missing_level = "Missing"
         self.unknown_level = -1
 
     def _create_pipeline(self, X: pd.DataFrame, y: Optional[pd.Series],
@@ -79,14 +79,13 @@ class MyKNN:
 
         X, _ = self._create_pipeline(X, y, "training")
 
-        parameters = { "n_neighbors": [1,3,5,10,15,25,50,100],
-                      # "weights": ['uniform', 'distance'],
-                       "metric": ['euclidean', 'manhattan', 'mahalanobis']
+        parameters = { "n_neighbors": [25],
+                       "weights": ['uniform', 'distance'],
+                      # "metric": ['euclidean', 'manhattan', 'mahalanobis']
                       }
 
         self.clf = GridSearchCV(self.clf, parameters,
-                                scoring=('neg_mean_absolute_error', 'neg_root_mean_squared_error'),
-                                refit="neg_root_mean_squared_error", n_jobs=-1, verbose=3)
+                                scoring='neg_log_loss', n_jobs=-1, verbose=3)
 
         self.clf.fit(X, y)
 
@@ -94,10 +93,8 @@ class MyKNN:
         results_df = pd.DataFrame({"params": cv_results['params'],
                                    "mean_fit_time": cv_results['mean_fit_time'],
                                    "mean_score_time": cv_results['mean_score_time'],
-                                   "mse_rank": cv_results['rank_test_neg_mean_absolute_error'],
-                                   "mse_results": cv_results['mean_test_neg_mean_absolute_error'],
-                                   "rmse_rank": cv_results['rank_test_neg_root_mean_squared_error'],
-                                   "rmse_results": cv_results['mean_test_neg_root_mean_squared_error']
+                                   "logloss_rank": cv_results['rank_test_score'],
+                                   "logloss_results": cv_results['mean_test_score'],
                                    })
 
 
@@ -105,13 +102,15 @@ class MyKNN:
 
     def run_learning_curve(self, X, y, parameters):
 
-        clf = KNeighborsRegressor(**parameters)
+        clf = KNeighborsClassifier(**parameters)
+
+        X, _ = self._create_pipeline(X, y, "training")
         clf.fit(X,y)
 
         train_sizes, train_scores, valid_scores,  \
             fit_times, score_times = learning_curve(clf, X, y,
                                                     n_jobs=-1, verbose=3, shuffle=True,
-                                                    scoring='neg_mean_absolute_error',
+                                                    scoring='neg_log_loss',
                                                     random_state=self.random_state,
                                                     return_times=True)
 
@@ -120,7 +119,7 @@ class MyKNN:
 
     def run_cv(self, X, y, parameters, k):
 
-        clf = KNeighborsRegressor(**parameters)
+        clf = KNeighborsClassifier(**parameters)
 
         scores = cross_validate(clf, X, y,
                                 n_jobs=-1, verbose=3,

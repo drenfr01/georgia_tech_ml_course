@@ -79,7 +79,6 @@ class Lemons:
     def run_svm(self, X_train, y_train, num_features, cat_features):
         my_svm = MySVM(random_state=42, num_features=num_features,
                        cat_features=cat_features)
-        """
         my_svm_clf, results_df = my_svm.tune_parameters(X_train, y_train)
         results_df.to_csv("svm_results_df.csv", index=False)
         """
@@ -96,7 +95,7 @@ class Lemons:
                                           "score_times": score_times})
 
         learning_curve_dt.to_csv("svm_learning_curve_results.csv", index=False)
-
+        """
 
     def run_knn(self, X_train, y_train, X_valid, y_valid,  num_features, cat_features):
 
@@ -109,9 +108,9 @@ class Lemons:
         print('Best parameters', parameters)
         """
 
-        parameters = {"n_neighbors": 10, "metric": "euclidean"}
+        parameters = {"n_neighbors": 25}
         train_sizes, train_scores, valid_scores, \
-        fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
+            fit_times, score_times = my_knn.run_learning_curve(X_train, y_train, parameters)
 
         learning_curve_dt = pd.DataFrame({"train_sizes": train_sizes,
                                           "train_scores": train_scores,
@@ -134,7 +133,6 @@ class Lemons:
         results_df.to_csv("xgb_results_df.csv", index=False)
 
         parameters = my_xgb_clf.best_params_
-        """
         parameters = {'max_depth': 6}
         train_sizes, train_scores, valid_scores, \
         fit_times, score_times = my_xgb.run_learning_curve(X_train, y_train, parameters)
@@ -147,17 +145,16 @@ class Lemons:
 
         learning_curve_dt.to_csv("xgb_learning_curve_results.csv", index=False)
 
-        """
         results = my_xgb.run_cv( X_train, y_train, parameters, 5)
 
-        parameters={"random_state": 42}
+        """
+        parameters={"random_state": 42, "max_depth": 3, "learning_rate": 0.1}
         exp_results = my_xgb.run_learning_iteration_curve(X_train, y_train, X_valid, y_valid, parameters)
 
-        iterations_curve_df = pd.DataFrame({"training": exp_results["validation_0"]['mae'],
-                                            "validation": exp_results['validation_1']['mae']})
+        iterations_curve_df = pd.DataFrame({"training": exp_results["validation_0"]['logloss'],
+                                            "validation": exp_results['validation_1']['logloss']})
         iterations_curve_df.to_csv("xgb_iterations_curve_results.csv", index=True)
         # return my_xgb_clf
-        """
 
     def run_lemons(self):
         print("Running lemons experiment")
@@ -180,7 +177,7 @@ class Lemons:
 
         print(X_train.shape)
 
-        self.run_dt(X_train, y_train, X_valid, y_valid, num_features, cat_features)
+        self.run_svm(X_train, y_train, num_features, cat_features)
 
         """
         nn = MyNet(input_size=len(num_features), num_epochs=10, batch_size=128,
